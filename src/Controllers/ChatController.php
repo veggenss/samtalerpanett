@@ -5,12 +5,12 @@ use Spn\Service\ChatService;
 
 class ChatController{
     private ChatService $chat;
-    
+
     public function __construct()
     {
         $this->chat = new ChatService;
     }
-    
+
     public function showChat()
     {
         try{
@@ -25,17 +25,17 @@ class ChatController{
             exit;
         }
     }
-    
+
     //fetch relevant logs
     public function getUserLogs(): void
-    {  
+    {
         header('Content-Type: application/json');
         try{
             echo json_encode([
                 'public' => $this->chat->getChat(),
                 'conversations' => $this->chat->getConversations($_SESSION['user']['id'])
             ]);
-            exit; 
+            exit;
         }
         catch(\Spn\Exceptions\InvalException $e){
             echo json_encode([
@@ -61,8 +61,8 @@ class ChatController{
             exit;
         }
     }
-    
-    
+
+
     //create user conversation
     public function makeConversation(): void
     {

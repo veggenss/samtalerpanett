@@ -5,22 +5,22 @@ use Spn\Service\AuthService;
 
 class AuthController{
     private AuthService $auth;
-    
+
     public function __construct()
     {
         $this->auth = new AuthService;
     }
-    
+
     public function showRegister(): void
     {
         require __DIR__ . '/../../views/auth/register.php';
     }
-    
+
     public function showEmailVerify(): void
     {
         require __DIR__ . '/../../views/auth/verify_email.php';
     }
-    
+
     public function showLogin(): void
     {
         require __DIR__ . '/../../views/auth/login.php';
@@ -30,8 +30,8 @@ class AuthController{
     {
         require __DIR__ . '/../../views/auth/password_reset.php';
     }
-    
-    
+
+
     public function login(): void
     {
         try{
@@ -39,12 +39,12 @@ class AuthController{
                 'username' => htmlspecialchars($_POST['username']),
                 'password' => htmlspecialchars($_POST['password'])
             ];
-            
+
             $user = $this->auth->login($data);
             $_SESSION['user']['id'] = $user['id'];
             $_SESSION['user']['username'] = $user['username'];
             $_SESSION['user']['email'] = $user['email'];
-            
+
             header('Location: /chat');
             exit;
         }
@@ -77,7 +77,7 @@ class AuthController{
             exit;
         }
     }
-    
+
     public function register(): void
     {
         try{
@@ -86,14 +86,14 @@ class AuthController{
                 'password' => htmlspecialchars($_POST['password']),
                 'email' => htmlspecialchars($_POST['email'])
             ];
-            
+
             $this->auth->register($data);
-            
+
             $_SESSION['flash'] = [
                 "class" => "success",
                 "message" => "Verifiserings e-post er send til {$data['email']}"
             ];
-            
+
             header('Location: /register');
             exit;
         }
@@ -123,7 +123,7 @@ class AuthController{
             exit;
         }
     }
-    
+
     public function handleEmailToken(): void
     {
         header('Content-Type: application/json');
@@ -141,6 +141,6 @@ class AuthController{
                 "message" => "Something went wrong, uppsie woopsie!"
             ]);
             exit;
-        } 
+        }
     }
 }
