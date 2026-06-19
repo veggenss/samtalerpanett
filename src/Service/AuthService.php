@@ -11,7 +11,7 @@ class AuthService{
         $this->userRepo = new UserRepository;
     }
 
-    private function sendVerificationEmail($to, $token): bool
+    private function sendVerificationEmail(string $to, string $token): bool
     {
         $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
         try{

@@ -1,9 +1,15 @@
 <?php
 namespace Spn\Controllers;
 
+use Spn\Exceptions\AuthException;
+use Spn\Exceptions\DatabaseException;
+use Spn\Exceptions\HandlesExceptions;
 use Spn\Service\AuthService;
 
-class AuthController{
+class AuthController
+{
+    use HandlesExceptions;
+
     private AuthService $auth;
 
     public function __construct()
@@ -31,7 +37,6 @@ class AuthController{
         require __DIR__ . '/../../views/auth/password_reset.php';
     }
 
-
     public function login(): void
     {
         try{
@@ -48,33 +53,16 @@ class AuthController{
             header('Location: /chat');
             exit;
         }
-        catch(\Spn\Exceptions\AuthException $e){
-            $_SESSION['flash'] = [
-                "class" => "error",
-                "message" => $e->getMessage()
-            ];
-            header('Location: /login');
-            exit;
+        catch(AuthException $e){
+            $this->redirectWithFlash('/login', 'error', $e->getMessage());
         }
-        // catch(\PHPMailer\PHPMailer\Exception $e){
-        //     throw new \Exception;
-        // }
-        catch(\Spn\Exceptions\DatabaseException $e){
+        catch(DatabaseException $e){
             error_log($e->getMessage());
-            $_SESSION['flash'] = [
-                "class" => "error",
-                "message" => "Noe gikk galt! Vennligst prøv igjen"
-            ];
-            header('Location: /login');
-            exit;
+            $this->redirectWithFlash('/login', 'error', 'Noe gikk galt! Vennligst prøv igjen');
         }
         catch(\Exception $e){
             error_log($e->getMessage());
-            $_SESSION['flash'] = [
-                "class" => "error",
-                "message" => "Ukjent feil!"
-            ];
-            exit;
+            $this->redirectWithFlash('/login', 'error', 'Ukjent feil!');
         }
     }
 
@@ -88,59 +76,48 @@ class AuthController{
             ];
 
             $this->auth->register($data);
-
-            $_SESSION['flash'] = [
-                "class" => "success",
-                "message" => "Verifiserings e-post er send til {$data['email']}"
-            ];
-
-            header('Location: /register');
-            exit;
+            $this->redirectWithFlash('/register', 'success', "Verifiserings e-post er sendt til {$data['email']}");
         }
-        catch(\Spn\Exceptions\AuthException $e){
-            $_SESSION['flash'] = [
-                "class" => "error",
-                "message" => $e->getMessage()
-            ];
-            header('Location: /register');
-            exit;
+        catch(AuthException $e){
+            $this->redirectWithFlash('/register', 'error', $e->getMessage());
         }
-        catch(\Spn\Exceptions\DatabaseException $e){
+        catch(DatabaseException $e){
             error_log($e->getMessage());
-            $_SESSION['flash'] = [
-                "class" => "error",
-                "message" => "Noe gikk galt! Vennligst prøv igjen"
-            ];
-            header('Location: /register');
-            exit;
+            $this->redirectWithFlash('/register', 'error', 'Noe gikk galt! Vennligst prøv igjen');
         }
         catch(\Exception $e){
             error_log($e->getMessage());
-            $_SESSION['flash'] = [
-                "class" => "error",
-                "message" => "Ukjent feil!"
-            ];
-            exit;
+            $this->redirectWithFlash('/register', 'error', 'Ukjent feil!');
         }
     }
 
     public function handleEmailToken(): void
     {
         header('Content-Type: application/json');
-        $token = json_decode(file_get_contents('php://input'), true);
+        $body  = json_decode(file_get_contents('php://input'), true);
+        $token = $body['token'] ?? '';
+
         try{
-            $this->auth->verifyEmail($token['token']);
-            echo json_encode([
-                "class" => "success"
-            ]);
-            exit;
+            $this->auth->verifyEmail($token);
+            echo json_encode(['class' => 'success']);
         }
-        catch(\Spn\Exceptions\AuthException $e){
-            echo json_encode([
-                "class" => "error",
-                "message" => "Something went wrong, uppsie woopsie!"
-            ]);
-            exit;
+        catch (AuthException $e){
+            $this->jsonError('Noe gikk galt, vennligst prøv igjen!');
         }
+        catch (DatabaseException $e){
+            error_log($e->getMessage());
+            $this->jsonError('Noe gikk galt, vennligst prøv igjen!');
+        }
+        catch (\Exception $e){
+            error_log($e->getMessage());
+            $this->jsonError('Ukjent feil!');
+        }
+    }
+
+    public function logout(): void
+    {
+        session_destroy();
+        header('Location: /login');
+        exit;
     }
 }

@@ -1,101 +1,58 @@
 <?php
 namespace Spn\Controllers;
 
+use Spn\Exceptions\DatabaseException;
+use Spn\Exceptions\HandlesExceptions;
+use Spn\Exceptions\ValidationException;
 use Spn\Service\ChatService;
+use Spn\Service\ConversationService;
 
-class ChatController{
+class ChatController
+{
+    use HandlesExceptions;
+
     private ChatService $chat;
+    private ConversationService $conversation;
 
     public function __construct()
     {
-        $this->chat = new ChatService;
+        $this->chat         = new ChatService;
+        $this->conversation = new ConversationService;
     }
 
-    public function showChat()
+    public function showChat(): void
     {
         try{
             $_SESSION['user']['wsToken'] = $this->chat->createWsToken($_SESSION['user']['id']);
             require __DIR__ . '/../../views/chat/main.php';
         }
-        catch(\Spn\Exceptions\InvalException $e){
-            echo json_encode([
-                "class" => "error",
-                "message" => "Failed to create WS token!"
-            ]);
-            exit;
+        catch(ValidationException $e){
+            error_log($e->getMessage());
+            $this->redirectWithFlash('/chat', 'error', 'Kunne ikke opprette WS-tilkobling, prøv igjen.');
+        }
+        catch(DatabaseException $e){
+            error_log($e->getMessage());
+            $this->redirectWithFlash('/chat', 'error', 'Noe gikk galt! Vennligst prøv igjen.');
         }
     }
 
-    //fetch relevant logs
     public function getUserLogs(): void
     {
         header('Content-Type: application/json');
         try{
             echo json_encode([
                 'public' => $this->chat->getChat(),
-                'conversations' => $this->chat->getConversations($_SESSION['user']['id'])
+                'conversations' => $this->conversation->getConversations($_SESSION['user']['id']),
             ]);
-            exit;
         }
-        catch(\Spn\Exceptions\InvalException $e){
-            echo json_encode([
-                "class" => "error",
-                "message" => $e->getMessage()
-            ]);
-            exit;
-        }
-        catch(\Spn\Exceptions\DatabaseException $e){
+        catch
+        (DatabaseException $e){
             error_log($e->getMessage());
-            echo json_encode([
-                "class" => "error",
-                "message" => "Noe gikk galt! Vennligst prøv igjen."
-            ]);
-            exit;
+            $this->jsonError('Noe gikk galt! Vennligst prøv igjen.');
         }
         catch(\Exception $e){
             error_log($e->getMessage());
-            echo json_encode([
-                "class" => "error",
-                "message" => "Ukjent feil!"
-            ]);
-            exit;
-        }
-    }
-
-
-    //create user conversation
-    public function makeConversation(): void
-    {
-        header('Content-Type: application/json');
-        $data = json_decode(file_get_contents('php://input'), true);
-        try{
-            echo json_encode([
-                'conversation' => $this->chat->makeConversation($_SESSION['user']['id'], $data)
-            ]);
-            exit;
-        }
-        catch(\Spn\Exceptions\InvalException $e){
-            echo json_encode([
-                "class" => "error",
-                "message" => $e->getMessage()
-            ]);
-            exit;
-        }
-        catch(\Spn\Exceptions\DatabaseException $e){
-            error_log($e->getMessage());
-            echo json_encode([
-                "class" => "error",
-                "message" => "Noe gikk galt! Vennligst prøv igjen"
-            ]);
-            exit;
-        }
-        catch(\Exception $e){
-            error_log($e->getMessage());
-            echo json_encode([
-                "class" => "error",
-                "message" => "Ukjent feil!"
-            ]);
-            exit;
+            $this->jsonError('Ukjent feil!');
         }
     }
 }

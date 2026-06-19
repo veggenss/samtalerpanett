@@ -506,7 +506,11 @@ dialog::backdrop {
 
 
 
-dialog form {
+/* Shared by real <dialog> popups AND plain .dialog-inner containers used
+   on standalone pages (e.g. the profile page), so a form looks the same
+   whether it's in a modal or on its own page. */
+dialog form,
+.dialog-inner form {
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -525,7 +529,8 @@ dialog form {
     gap: 6px;
 }
 
-dialog label {
+dialog label,
+.dialog-inner label {
     font-size: 0.82rem;
     font-weight: 600;
     color: var(--text-muted);
@@ -534,7 +539,11 @@ dialog label {
 dialog input[type="text"],
 dialog input[type="email"],
 dialog input[type="password"],
-dialog textarea {
+dialog textarea,
+.dialog-inner input[type="text"],
+.dialog-inner input[type="email"],
+.dialog-inner input[type="password"],
+.dialog-inner textarea {
     width: 100%;
     padding: 10px 13px;
     border-radius: 9px;
@@ -547,7 +556,9 @@ dialog textarea {
 }
 
 dialog input:focus,
-dialog textarea:focus {
+dialog textarea:focus,
+.dialog-inner input:focus,
+.dialog-inner textarea:focus {
     border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(91,95,240,0.15);
     outline: none;
@@ -670,6 +681,73 @@ dialog textarea:focus {
     align-items: center;
     gap: 10px;
     margin-bottom: 10px;
+}
+
+
+
+.profile-body {
+    background-image: url("/assets/backgrounds/SamtalerPaaNettBanner.png");
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+.profile-body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(255, 255, 255, 0.25);
+    pointer-events: none;
+    z-index: 1;
+    backdrop-filter: blur(2px);
+}
+
+.profile-page {
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    overflow-y: auto;
+    position: relative;
+    z-index: 10;
+}
+
+.profile-page .dialog-inner {
+    width: 100%;
+    max-width: 480px;
+    position: relative;
+    z-index: 1;
+    background: #f9faff;
+    background: var(--bg-panel, #f9faff);
+    box-shadow: 0 12px 40px rgba(15, 23, 42, 0.25);
+}
+
+.profile-page .dialog-header h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.profile-page .dialog-header a.btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+}
+
+.profile-page .dialog-actions a.btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    padding: 9px 20px;
+    font-weight: 600;
+    text-decoration: none;
 }
 
 @media (max-width: 1000px) {

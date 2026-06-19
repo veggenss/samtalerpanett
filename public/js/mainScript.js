@@ -2,85 +2,36 @@ const alertCon = document.getElementById('alert-container');
 const messagesDiv = document.getElementById('messages');
 const input = document.getElementById('messageInput');
 const sendButton = document.getElementById('sendButton');
-
-const newConvPartyInput = document.getElementById('newConvParticipants');
-const newConvPartyAdd = document.getElementById('addParticipantBtn');
-
 const convList = document.getElementById('conv-list');
 const globalChat = document.getElementById('global-chat');
-
 const ctxMenu = document.getElementById('msg-ctx-menu');
 const ctxDelete = document.getElementById('ctx-delete');
+
 let ctxTargetMsgId = null;
+let activeConvId = null;
+let sending = false;
+let ws = null;
 
 const userId = window.currentUser.id;
 const username = window.currentUser.username;
 const wsToken = window.currentUser.wsToken;
 
-let activeConvId = null;
-let sending = false;
-let ws = null;
-console.log(userId, username);
 
-const getNewConvPartyCount = () => newConvPartyInput.querySelectorAll('.participant:not(.self)').length;
-
-
-//dialog methods
-function showDialogError(dialog, message) {
+function showDialogError(dialog, message){
     const el = dialog.querySelector('.dialog-error');
-    if (!el) return;
+    if(!el) return;
     el.querySelector('p').textContent = message;
     el.hidden = false;
 }
 
-function clearDialogError(dialog) {
+function clearDialogError(dialog){
     const el = dialog.querySelector('.dialog-error');
     if(!el) return;
     el.hidden = true;
 }
 
-function setupDialog(dialogId, openBtnId, formId, onOpen, onSubmit) {
-    const dialog = document.getElementById(dialogId);
-    const form = document.getElementById(formId);
-    const openBtn = document.getElementById(openBtnId);
 
-    if(!dialog || !form) {
-        console.warn(`setupDialog: undefined: "${dialogId}"`);
-        return;
-    }
 
-    openBtn?.addEventListener('click', () => {
-        form.reset();
-        clearDialogError(dialog);
-        onOpen?.(dialog, form);
-        dialog.showModal();
-    });
-
-    dialog.addEventListener('click', (e) => {
-        if(e.target === dialog) dialog.close();
-    });
-
-    dialog.querySelector('.dialog-close')?.addEventListener('click', () => dialog.close());
-    dialog.querySelector('.dialog-cancel')?.addEventListener('click', () => dialog.close());
-
-    const fileInput = dialog.querySelector('input[type="file"]');
-    const preview = dialog.querySelector('.profile-avatar-preview');
-    if(fileInput && preview) {
-        fileInput.addEventListener('change', () => {
-            const file = fileInput.files[0];
-            if(file) preview.src = URL.createObjectURL(file);
-        });
-    }
-
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        clearDialogError(dialog);
-        const data = Object.fromEntries(new FormData(form));
-        await onSubmit(data, dialog, form);
-    });
-}
-
-//context menus
 function showContextMenu(x, y, msgId) {
     ctxTargetMsgId = msgId;
     ctxMenu.style.left = x + 'px';
@@ -89,13 +40,14 @@ function showContextMenu(x, y, msgId) {
 }
 
 function hideContextMenu() {
-    ctxMenu.hidden = true;
-    ctxTargetMsgId = null;
+    ctxMenu.hidden     = true;
+    ctxTargetMsgId     = null;
 }
 
-//chatStore
+
+
 const chatStore = {
-    public: [],
+    public:  [],
     private: {},
 
     upsertMessages(type, convId, msgs){
@@ -103,23 +55,19 @@ const chatStore = {
             this.public = this.merge(this.public, msgs);
         }
         else{
-            if(!convId) throw new TypeError("Undefined convId");
+            if(!convId) throw new TypeError('Undefined convId');
             this.private[convId] = this.merge(this.private[convId], msgs);
         }
     },
 
     addMessage(type, convId, msg){
-        if(!msg) throw new TypeError("Undefined msg");
-
+        if(!msg) throw new TypeError('Undefined msg');
         if(type === 'public'){
             this.public = this.insertSorted(this.public, msg);
             return;
         }
-
-        if(!convId) throw new TypeError("Undefined ConvId");
-
+        if(!convId) throw new TypeError('Undefined ConvId');
         if(!this.private[convId]) this.private[convId] = [];
-
         this.private[convId] = this.insertSorted(this.private[convId], msg);
     },
 
@@ -128,48 +76,39 @@ const chatStore = {
         if(!convId){
             this.public = filter(this.public);
         }
-        else{
-            if(this.private[convId]) this.private[convId] = filter(this.private[convId]);
+        else if(this.private[convId]){
+            this.private[convId] = filter(this.private[convId]);
         }
     },
 
     merge(existing = [], incoming = []){
         const map = new Map();
-
-        [...existing, ...incoming].forEach(msg => {
-            map.set(msg.id, msg);
-        });
-
+        [...existing, ...incoming].forEach(msg => map.set(msg.id, msg));
         return this.sort([...map.values()]);
     },
 
     insertSorted(arr, msg){
-        const newArr = [...arr, msg];
-        return this.sort(newArr);
+        return this.sort([...arr, msg]);
     },
 
     sort(arr){
         return [...arr].sort((a, b) => {
-            if(a.date_added === b.date_added){
-                return Number(a.id) - Number(b.id);
-            }
+            if(a.date_sent === b.date_sent) return Number(a.id) - Number(b.id);
             return new Date(a.date_sent) - new Date(b.date_sent);
         });
-    }
+    },
 };
 
 
-//message styling
+
 function appendMessage(data) {
     const wrapper = document.createElement('div');
     wrapper.classList.add('message');
     wrapper.dataset.msgId = data.id;
 
-    if (data.sender_id == userId) {
-        wrapper.classList.add('self');
-    }
+    if(data.sender_id == userId) wrapper.classList.add('self');
 
-    if (data.username === "[System]") {
+    if(data.username === '[System]'){
         wrapper.classList.add('system');
         wrapper.textContent = data.message || '';
         messagesDiv.appendChild(wrapper);
@@ -189,7 +128,7 @@ function appendMessage(data) {
 
     const textDiv = document.createElement('div');
     textDiv.classList.add('text');
-    textDiv.textContent = data.message || data[0];
+    textDiv.textContent = data.message || '';
 
     const time = document.createElement('span');
     time.classList.add('timestamp');
@@ -198,15 +137,12 @@ function appendMessage(data) {
     content.appendChild(usernameSpan);
     content.appendChild(textDiv);
     content.appendChild(time);
-
     wrapper.appendChild(avatar);
     wrapper.appendChild(content);
 
     messagesDiv.appendChild(wrapper);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
-
-
 
 document.addEventListener('DOMContentLoaded', () => {
     function init() {
@@ -217,38 +153,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    //setup dialog
+
     function setupDialogs() {
-        setupDialog(
-            'create-conversation',
-            'new-conv',
-            'new-conversation-form',
-            (dialog, form) => {
-                newConvPartyInput.innerHTML = `
-                    <div class="participant self">
-                        <input type="text" value="${username}" disabled>
-                    </div>
-                `;
-            },
+        const newConvDialog = document.getElementById('create-conversation');
+        const newConvForm   = document.getElementById('new-conversation-form');
 
-            async (data, dialog, form) => {
-                const participants = [...newConvPartyInput.querySelectorAll('input')]
-                    .filter(i => !i.disabled)
-                    .map(i => i.value.trim())
-                    .filter(Boolean);
+        newConvDialog.querySelector('.dialog-close')?.addEventListener('click', () => newConvDialog.close());
+        newConvDialog.querySelector('.dialog-cancel')?.addEventListener('click', () => newConvDialog.close());
+        newConvDialog.addEventListener('click', (e) => { if (e.target === newConvDialog) newConvDialog.close(); });
 
-                if (participants.length < 1) {
-                    showDialogError(dialog, "Legg til minst én deltaker.");
-                    return;
-                }
+        newConvDialog.addEventListener('close', () => {
+            newConvForm.reset();
+            clearDialogError(newConvDialog);
+            resetParticipants();
+        });
 
-                const ok = await makeConversation(data.convName, participants);
-                if (ok) dialog.close();
-            }
-        );
+        function resetParticipants() {
+            document.getElementById('newConvParticipants').innerHTML = `
+                <div class="participant self">
+                    <input type="text" value="${username}" disabled>
+                </div>
+            `;
+        }
 
-        newConvPartyAdd.addEventListener('click', () => {
-            if (getNewConvPartyCount() >= 9) return;
+        document.getElementById('addParticipantBtn')?.addEventListener('click', () => {
+            const partyInput = document.getElementById('newConvParticipants');
+            if (partyInput.querySelectorAll('.participant:not(.self)').length >= 9) return;
 
             const wrapper = document.createElement('div');
             wrapper.classList.add('participant');
@@ -257,79 +187,82 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button type="button" class="remove"><i class="fa-solid fa-xmark"></i></button>
             `;
             wrapper.querySelector('.remove').onclick = () => wrapper.remove();
-            newConvPartyInput.appendChild(wrapper);
+            partyInput.appendChild(wrapper);
         });
 
-        setupDialog(
-            'my-profile',
-            'open-profile',
-            'my-profile-form',
-            null,
-            async (data, dialog, form) => {
-                const ok = await saveProfile(data);
-                if(ok) dialog.close();
-            }
-        );
+        // Open new conversation dialog
+        document.getElementById('new-conv')?.addEventListener('click', () => {
+            resetParticipants();
+            newConvDialog.showModal();
+        });
 
-        setupDialog(
-            'password-confirmation',
-            'delete-user-btn',
-            'delete-user-form',
-            null,
-            async (data, dialog, form) => {
-                console.log(data);
-                const agree = confirm("Er du sikker at du vil slette brukeren din?");
-                if(!agree) return;
-                await deleteUser(data.password);
-            }
-        )
+        // Navigate to profile page
+        document.getElementById('open-profile')?.addEventListener('click', () => {
+            window.location.href = '/chat/profile';
+        });
 
+        // New conversation submit
+        newConvForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearDialogError(newConvDialog);
+
+            const partyInput   = document.getElementById('newConvParticipants');
+            const participants = [...partyInput.querySelectorAll('input')]
+                .filter(i => !i.disabled)
+                .map(i => i.value.trim())
+                .filter(Boolean);
+
+            if (participants.length < 1) {
+                showDialogError(newConvDialog, 'Legg til minst én deltaker.');
+                return;
+            }
+
+            const ok = await makeConversation(document.getElementById('convName').value, participants);
+            if (ok) newConvDialog.close();
+        });
     }
 
 
-    //event listeners
+
     function setupEventListeners() {
         sendButton.onclick = sendMessage;
 
         document.addEventListener('click', hideContextMenu);
 
         input.addEventListener('keydown', (e) => {
-            if(e.key === 'Enter') {
+            if (e.key === 'Enter') {
                 e.preventDefault();
                 sendMessage();
             }
         });
 
-        // toggle globalChat
         globalChat.addEventListener('click', () => {
             activeConvId = null;
             messagesDiv.innerHTML = '';
             renderMessages();
-
             document.querySelectorAll('.conversation, #global-chat').forEach(el => el.classList.remove('active'));
             globalChat.classList.add('active');
         });
 
         messagesDiv.addEventListener('contextmenu', (e) => {
-           const bubble = e.target.closest('.message.self');
-           if(!bubble) return;
-           e.preventDefault();
-           showContextMenu(e.clientX, e.clientY, bubble.dataset.msgId);
+            const bubble = e.target.closest('.message.self');
+            if (!bubble) return;
+            e.preventDefault();
+            showContextMenu(e.clientX, e.clientY, bubble.dataset.msgId);
         });
 
         ctxDelete.addEventListener('click', () => {
-            if(ctxTargetMsgId) deleteMessage(ctxTargetMsgId, activeConvId);
+            if (ctxTargetMsgId) deleteMessage(ctxTargetMsgId, activeConvId);
             hideContextMenu();
         });
     }
 
 
-    //api calls
+
     async function getUserLogs() {
         try {
-            const req = await fetch('/api/get-user-logs', {method: 'POST'});
+            const req  = await fetch('/api/get-user-logs', { method: 'POST' });
             const data = await req.json();
-            if(data) console.log("Fetched!", data);
 
             chatStore.upsertMessages('public', null, data.public);
 
@@ -339,93 +272,42 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             renderMessages();
-            console.log("public: ", chatStore.public, "\n", "private: ", chatStore.private);
-        }
-        catch(err){
-            console.error('Failed to getChat ', err);
+        } catch (err) {
+            console.error('Failed to getUserLogs:', err);
         }
     }
 
     async function makeConversation(title, participants) {
-        try{
-            const req = await fetch('/api/make-conv', {
-                method: 'POST',
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({title: title, parties: participants})
-            });
-            const data = await req.json();
-
-            if (data.class) {
-                const dialog = document.getElementById('create-conversation');
-                showDialogError(dialog, data.message);
-                return false;
-            }
-
-            if(data.conversation) getUserLogs();
-            return true;
-        }
-        catch(err){
-            console.error('newConversation: ', err);
-            return false;
-        }
-    }
-
-    async function saveProfile(formInput){
         try {
-            const formData = new FormData();
-            Object.entries(formInput).forEach(([k, v]) => formData.append(k, v));
-
-            const fileInput = document.getElementById('profile_picture');
-            if (fileInput.files[0]) formData.append('profile_picture', fileInput.files[0]);
-
-            const req = await fetch('/api/save-profile', {
-                method: 'POST',
-                body: formData
-            });
-            const res = await req.json();
-
-            if (res.class === 'error') {
-                showDialogError(document.getElementById('my-profile'), res.message);
-                return false;
-            }
-            return true;
-        }
-        catch(err) {
-            console.error('saveProfile:', err);
-            return false;
-        }
-    }
-
-    async function deleteUser(password) {
-        try{
-            const req = await fetch('/api/delete-user', {
-                method: 'POST',
+            const req  = await fetch('/api/make-conv', {
+                method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: password })
+                body:    JSON.stringify({ title, parties: participants }),
             });
             const data = await req.json();
+
             if (data.class === 'error') {
-                const dialog = document.getElementById('password-confirmation');
-                showDialogError(dialog, data.message);
+                showDialogError(document.getElementById('create-conversation'), data.message);
                 return false;
             }
-            window.location.href = '/logout';
-        }
-        catch(err){
-            console.error('deleteAccount:', err);
+
+            if (data.conversation) getUserLogs();
+            return true;
+        } catch (err) {
+            console.error('makeConversation:', err);
             return false;
         }
     }
 
-    //rendering
-    function renderMessages(){
+
+
+    function renderMessages() {
         messagesDiv.innerHTML = '';
         const messages = activeConvId ? (chatStore.private[activeConvId] || []) : chatStore.public;
         messages.forEach(msg => appendMessage(msg));
     }
 
     function renderConversationList(data) {
-        console.log("render", data);
         if (document.getElementById('conversation-' + data.id)) return;
 
         const convWrapper = document.createElement('div');
@@ -438,20 +320,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const textWrapper = document.createElement('div');
         textWrapper.classList.add('conversation-userText');
 
-        const username = document.createElement('span');
-        username.classList.add('conversation-name');
-        username.textContent = data.title;
+        const nameSpan = document.createElement('span');
+        nameSpan.classList.add('conversation-name');
+        nameSpan.textContent = data.title;
 
         const prevStr = document.createElement('span');
         prevStr.classList.add('conversation-prevStr');
-        prevStr.textContent = data.latest_message;
+        prevStr.textContent = data.latest_message || '';
 
         const icon = document.createElement('img');
         icon.classList.add('conversation-avatar');
-        icon.src = '/assets/icons/default.png'; //should be data.icon
+        icon.src = '/assets/icons/default.png';
 
         userWrapper.appendChild(icon);
-        textWrapper.appendChild(username);
+        textWrapper.appendChild(nameSpan);
         textWrapper.appendChild(prevStr);
         userWrapper.appendChild(textWrapper);
         convWrapper.appendChild(userWrapper);
@@ -459,107 +341,74 @@ document.addEventListener('DOMContentLoaded', () => {
         convWrapper.addEventListener('click', () => {
             activeConvId = data.id;
             renderMessages();
+            document.querySelectorAll('.conversation, #global-chat').forEach(el => el.classList.remove('active'));
+            convWrapper.classList.add('active');
         });
 
         convList.appendChild(convWrapper);
     }
 
 
-    //messaging
+
     function sendMessage() {
         if (sending) return;
         sending = true;
 
         const text = input.value.trim();
-        if (text === '') {
-            sending = false;
-            return;
-        }
+        if (!text) { sending = false; return; }
 
         if (text.length > 400) {
             sending = false;
-            appendMessage({
-                id: 'sys-' + Date.now(),
-                username: "[System]",
-                message: "Meldingen er for lang. Maks 400 tegn.",
-                date_added: new Date().toISOString()
-            });
+            appendMessage({ id: 'sys-' + Date.now(), username: '[System]', message: 'Meldingen er for lang. Maks 400 tegn.', date_sent: new Date().toISOString() });
             return;
         }
 
         if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-                type: 'message',
-                username: username,
-                sender_id: userId,
-                conv_id: activeConvId,
-                message: text,
-            }));
-        }
-        else {
-            appendMessage({
-                id: 'sys-' + Date.now(),
-                username: "[System]",
-                message: "Noe Gikk Galt!",
-                date_added: new Date().toISOString()
-            });
+            ws.send(JSON.stringify({ type: 'message', username, sender_id: userId, conv_id: activeConvId, message: text }));
+        } else {
+            appendMessage({ id: 'sys-' + Date.now(), username: '[System]', message: 'Noe gikk galt!', date_sent: new Date().toISOString() });
         }
 
         input.value = '';
         setTimeout(() => { sending = false; }, 1000);
     }
 
-    function deleteMessage(msgId){
-        if(ws.readyState !== WebSocket.OPEN) return;
-
-        ws.send(JSON.stringify({
-            type: 'delete',
-            message_id: msgId,
-            conv_id: activeConvId
-        }));
+    function deleteMessage(msgId) {
+        if (ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({ type: 'delete', message_id: msgId, conv_id: activeConvId }));
     }
 
-    //websocket connection
+
+
     function websocketConn() {
         ws = new WebSocket(`ws://127.0.0.1:9501?token=${wsToken}`);
-        console.log("token: ", wsToken);
-        ws.onopen = () => {
-            console.log("Tilkobling til websocket åpnet");
-        }
+
+        ws.onopen = () => console.log('WebSocket åpnet');
 
         ws.onclose = () => {
-            console.error("Tilkobling til websocket lukket");
-            appendMessage({
-                id: 'sys-' + Date.now(),
-                username: "[System]",
-                message: "Tilkoblingen ble lukket",
-                date_added: new Date().toISOString()
-            });
-        }
+            console.error('WebSocket lukket');
+            appendMessage({ id: 'sys-' + Date.now(), username: '[System]', message: 'Tilkoblingen ble lukket', date_sent: new Date().toISOString() });
+        };
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            console.log("Incoming:", data);
 
-            if(data.type === 'delete'){
+            if (data.type === 'delete') {
                 chatStore.removeMessage(data.message_id, data.conv_id);
                 document.querySelector(`[data-msg-id="${data.message_id}"]`)?.remove();
                 return;
             }
 
-            const isGlobalMsg = data.conv_id === null;
-
-            if (isGlobalMsg) {
+            if (data.conv_id === null) {
                 chatStore.addMessage('public', null, data);
-            }
-            else{
+            } else {
                 chatStore.addMessage('private', data.conv_id, data);
             }
 
-            if((!data.conv_id && !activeConvId) || data.conv_id === activeConvId){
+            if ((!data.conv_id && !activeConvId) || data.conv_id === activeConvId) {
                 renderMessages();
             }
-        }
+        };
     }
 
     init();
