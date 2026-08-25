@@ -16,7 +16,7 @@ class ChatController
 
     public function __construct()
     {
-        $this->chat         = new ChatService;
+        $this->chat = new ChatService;
         $this->conversation = new ConversationService;
     }
 

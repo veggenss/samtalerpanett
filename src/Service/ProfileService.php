@@ -32,10 +32,6 @@ class ProfileService{
 
     public function updateProfile(int $userId, array $data): bool
     {
-        // TODO: not yet implemented - no persistence layer exists yet for
-        // editable profile fields (username/email/password/profile picture).
-        // Wiring is fixed up so this no longer 500s, but the actual save
-        // logic still needs to be designed before this does anything.
         return false;
     }
 }

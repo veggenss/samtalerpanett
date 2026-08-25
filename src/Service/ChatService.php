@@ -14,8 +14,8 @@ class ChatService
 
     public function __construct()
     {
-        $this->chatRepo    = new ChatRepository;
-        $this->userRepo    = new UserRepository;
+        $this->chatRepo = new ChatRepository;
+        $this->userRepo = new UserRepository;
         $this->convService = new ConversationService;
     }
 
