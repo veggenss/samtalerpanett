@@ -80,9 +80,9 @@
 
     <script>
         window.currentUser = {
-            id:       "<?php echo htmlspecialchars((string)$_SESSION['user']['id']); ?>",
+            id: "<?php echo htmlspecialchars((string)$_SESSION['user']['id']); ?>",
             username: "<?php echo htmlspecialchars($_SESSION['user']['username']); ?>",
-            wsToken:  "<?php echo htmlspecialchars($_SESSION['user']['wsToken']); ?>"
+            wsToken: "<?php echo htmlspecialchars($_SESSION['user']['wsToken']); ?>"
         }
     </script>
     <script src="/js/mainScript.js"></script>

@@ -1,3 +1,5 @@
+// Worlds worst .js file
+
 const alertCon = document.getElementById('alert-container');
 const messagesDiv = document.getElementById('messages');
 const input = document.getElementById('messageInput');
@@ -40,14 +42,14 @@ function showContextMenu(x, y, msgId) {
 }
 
 function hideContextMenu() {
-    ctxMenu.hidden     = true;
-    ctxTargetMsgId     = null;
+    ctxMenu.hidden = true;
+    ctxTargetMsgId = null;
 }
 
 
 
 const chatStore = {
-    public:  [],
+    public: [],
     private: {},
 
     upsertMessages(type, convId, msgs){
